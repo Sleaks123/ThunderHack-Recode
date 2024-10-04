@@ -12,7 +12,7 @@ import thunder.hack.events.impl.PlayerUpdateEvent;
 import thunder.hack.features.modules.Module;
 import thunder.hack.setting.Setting;
 import thunder.hack.setting.impl.BooleanSettingGroup;
-import java.util.Random;
+import java.util.Random;//idkbro
 
 public final class TriggerBot extends Module {
     public final Setting<Float> attackRange = new Setting<>("Range", 3.0F, 1.0F, 7.0F);
