@@ -21,8 +21,8 @@ public final class TriggerBot extends Module {
     public final Setting<Boolean> autoJump = new Setting<>("AutoJump", false).addToGroup(smartCrit);
     public final Setting<Boolean> ignoreWalls = new Setting<>("IgnoreWalls", false);
     public final Setting<Boolean> pauseEating = new Setting<>("PauseWhileEating", false);
-    public final Setting<Integer> minDelay = new Setting<>("RandomDelayMin", 2, 0, 20);
-    public final Setting<Integer> maxDelay = new Setting<>("RandomDelayMax", 13, 0, 20);
+    public final Setting<Integer> minDelay = new Setting<>("RandomDelayMin", 1, 1, 2); // Set for 50ms (1 tick)
+    public final Setting<Integer> maxDelay = new Setting<>("RandomDelayMax", 2, 1, 2); // Set for 100ms (2 ticks)
 
     private int delay;
     private final Random random = new Random(); // For random delay
@@ -52,12 +52,8 @@ public final class TriggerBot extends Module {
             mc.interactionManager.attackEntity(mc.player, ent);
             mc.player.swingHand(Hand.MAIN_HAND);
 
-            // Set delay for the next hit (10 to 20 ms)
-            delay = random.nextInt(minDelay.getValue(), maxDelay.getValue() + 1) ; // (20ms / 50ms per tick = ~0.4 ticks, 10ms / 50ms = ~0.2 ticks)
-            // ulybaka1337: am i cooking???
-            // default delay is calculated with
-            // nextInt(11) + 2
-            // so max value is 11+2=13 and min is 2
+            // Set delay for the next hit (50 to 100 ms)
+            delay = random.nextInt(minDelay.getValue(), maxDelay.getValue() + 1);
         }
     }
 
@@ -93,4 +89,3 @@ public final class TriggerBot extends Module {
         return true;
     }
 }
-
