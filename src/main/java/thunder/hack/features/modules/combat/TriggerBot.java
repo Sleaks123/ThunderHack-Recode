@@ -12,19 +12,11 @@ import thunder.hack.core.Managers;
 import thunder.hack.core.manager.client.ModuleManager;
 import thunder.hack.events.impl.PlayerUpdateEvent;
 import thunder.hack.features.modules.Module;
-import thunder.hack.setting.Setting;
-import thunder.hack.setting.impl.BooleanSettingGroup;
 
 import java.util.Random;
 
 public final class TriggerBot extends Module {
-    public final Setting<Float> attackRange = new Setting<>("Range", 3f, 1f, 7.0f);
-    public final Setting<BooleanSettingGroup> smartCrit = new Setting<>("SmartCrit", new BooleanSettingGroup(true));
-    public final Setting<Boolean> onlySpace = new Setting<>("OnlyCrit", false).addToGroup(smartCrit);
-    public final Setting<Boolean> autoJump = new Setting<>("AutoJump", false).addToGroup(smartCrit);
-    public final Setting<Boolean> ignoreWalls = new Setting<>("IgnoreWalls", false);
-    public final Setting<Boolean> pauseEating = new Setting<>("PauseWhileEating", false);
-    public final Setting<Boolean> requireWeapon = new Setting<>("RequireWeapon", false);
+    private final TriggerBotSettings settings = new TriggerBotSettings();  // Initialize settings class
 
     private int delay;
     private final Random random = new Random(); // For random delay
@@ -35,17 +27,31 @@ public final class TriggerBot extends Module {
 
     @EventHandler
     public void onAttack(PlayerUpdateEvent e) {
-        if (mc.player.isUsingItem() && pauseEating.getValue()) {
+        if (mc.player.isUsingItem() && settings.pauseEating.getValue()) {
             return;
         }
 
         // Check if requireWeapon is enabled and if the player has a weapon in hand
-        if (requireWeapon.getValue() && !isHoldingWeapon()) {
+        if (settings.requireWeapon.getValue() && !isHoldingWeapon()) {
             return; // Exit if no weapon is found in hand
         }
 
-        if (!mc.options.jumpKey.isPressed() && mc.player.isOnGround() && autoJump.getValue())
+        // Wait until the attack cooldown is ready (1.0 means fully charged)
+        if (mc.player.getAttackCooldownProgress(0) < 1.0f) {
+            return; // Don't attack if cooldown isn't ready
+        }
+
+        // If delay is enabled, apply 1-2 ticks delay before hitting again
+        if (settings.enableDelay.getValue()) {
+            if (delay > 0) {
+                delay--;
+                return; // Wait for the delay to finish
+            }
+        }
+
+        if (!mc.options.jumpKey.isPressed() && mc.player.isOnGround() && settings.autoJump.getValue()) {
             mc.player.jump();
+        }
 
         // Smart crits should not be delayed
         if (!autoCrit()) {
@@ -55,19 +61,21 @@ public final class TriggerBot extends Module {
             }
         }
 
-        Entity ent = Managers.PLAYER.getRtxTarget(mc.player.getYaw(), mc.player.getPitch(), attackRange.getValue(), ignoreWalls.getValue());
+        Entity ent = Managers.PLAYER.getRtxTarget(mc.player.getYaw(), mc.player.getPitch(), settings.attackRange.getValue(), settings.ignoreWalls.getValue());
         if (ent != null && !Managers.FRIEND.isFriend(ent.getName().getString())) {
             mc.interactionManager.attackEntity(mc.player, ent);
             mc.player.swingHand(Hand.MAIN_HAND);
 
-            // Set delay for the next hit (50ms to 100ms)
-            delay = random.nextInt(2) + 1;  // Random delay between 1 and 2 ticks (50-100ms)
+            // Set delay for the next hit (only if delay is enabled)
+            if (settings.enableDelay.getValue()) {
+                delay = random.nextInt(2) + 1;  // Random delay between 1 and 2 ticks (50-100ms)
+            }
         }
     }
 
     private boolean autoCrit() {
         boolean reasonForSkipCrit =
-                !smartCrit.getValue().isEnabled()
+                !settings.smartCrit.getValue().isEnabled()
                         || mc.player.getAbilities().flying
                         || (mc.player.isFallFlying() || ModuleManager.elytraPlus.isEnabled())
                         || mc.player.hasStatusEffect(StatusEffects.BLINDNESS)
@@ -83,17 +91,21 @@ public final class TriggerBot extends Module {
         boolean mergeWithTargetStrafe = !ModuleManager.targetStrafe.isEnabled() || !ModuleManager.targetStrafe.jump.getValue();
         boolean mergeWithSpeed = !ModuleManager.speed.isEnabled() || mc.player.isOnGround();
 
-        if (!mc.options.jumpKey.isPressed() && mergeWithTargetStrafe && mergeWithSpeed && !onlySpace.getValue() && !autoJump.getValue())
+        if (!mc.options.jumpKey.isPressed() && mergeWithTargetStrafe && mergeWithSpeed && !settings.onlySpace.getValue() && !settings.autoJump.getValue()) {
             return true;
+        }
 
-        if (mc.player.isInLava())
+        if (mc.player.isInLava()) {
             return true;
+        }
 
-        if (!mc.options.jumpKey.isPressed() && ModuleManager.aura.isAboveWater())
+        if (!mc.options.jumpKey.isPressed() && ModuleManager.aura.isAboveWater()) {
             return true;
+        }
 
-        if (!reasonForSkipCrit)
+        if (!reasonForSkipCrit) {
             return !mc.player.isOnGround() && mc.player.fallDistance > 0.0f;
+        }
         return true;
     }
 
