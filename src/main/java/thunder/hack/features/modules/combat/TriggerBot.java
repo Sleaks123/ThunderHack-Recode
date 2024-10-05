@@ -24,8 +24,6 @@ public final class TriggerBot extends Module {
     public final Setting<Boolean> autoJump = new Setting<>("AutoJump", false).addToGroup(smartCrit);
     public final Setting<Boolean> ignoreWalls = new Setting<>("IgnoreWalls", false);
     public final Setting<Boolean> pauseEating = new Setting<>("PauseWhileEating", false);
-    public final Setting<Integer> minDelay = new Setting<>("RandomDelayMin", 2, 0, 20);
-    public final Setting<Integer> maxDelay = new Setting<>("RandomDelayMax", 13, 0, 20);
     public final Setting<Boolean> requireWeapon = new Setting<>("RequireWeapon", false);
 
     private int delay;
@@ -62,8 +60,8 @@ public final class TriggerBot extends Module {
             mc.interactionManager.attackEntity(mc.player, ent);
             mc.player.swingHand(Hand.MAIN_HAND);
 
-            // Set delay for the next hit (10 to 20 ms)
-            delay = random.nextInt(minDelay.getValue(), maxDelay.getValue() + 1); 
+            // Set delay for the next hit (50ms to 100ms)
+            delay = random.nextInt(2) + 1;  // Random delay between 1 and 2 ticks (50-100ms)
         }
     }
 
