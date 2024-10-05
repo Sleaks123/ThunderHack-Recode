@@ -19,6 +19,7 @@ public final class TriggerBot extends Module {
     private final TriggerBotSettings settings = new TriggerBotSettings();  // Initialize settings class
 
     private int delay;
+    private int hitDelayTicks;  // Counter for the hit delay
     private final Random random = new Random(); // For random delay
 
     public TriggerBot() {
@@ -35,13 +36,17 @@ public final class TriggerBot extends Module {
         if (settings.requireWeapon.getValue() && !isHoldingWeapon()) {
             return; // Exit if no weapon is found in hand
         }
-
-        // Wait until the attack cooldown is ready (1.0 means fully charged)
-        if (mc.player.getAttackCooldownProgress(0) < 1.0f) {
-            return; // Don't attack if cooldown isn't ready
+        // Implement the hit delay (1 tick delay after the cooldown is ready)
+        if (settings.hitDelayEnabled.getValue()) {
+            if (hitDelayTicks > 0) {
+                hitDelayTicks--;  // Wait for the hit delay to finish
+                return;
+            } else {
+                hitDelayTicks = 1;  // Set delay to 1 tick for the next swing
+            }
         }
 
-        // If delay is enabled, apply 1-2 ticks delay before hitting again
+        // If delay between hits is enabled, apply 1-2 ticks delay before hitting again
         if (settings.enableDelay.getValue()) {
             if (delay > 0) {
                 delay--;
@@ -66,7 +71,7 @@ public final class TriggerBot extends Module {
             mc.interactionManager.attackEntity(mc.player, ent);
             mc.player.swingHand(Hand.MAIN_HAND);
 
-            // Set delay for the next hit (only if delay is enabled)
+            // Set delay for the next hit (only if delay between hits is enabled)
             if (settings.enableDelay.getValue()) {
                 delay = random.nextInt(2) + 1;  // Random delay between 1 and 2 ticks (50-100ms)
             }
