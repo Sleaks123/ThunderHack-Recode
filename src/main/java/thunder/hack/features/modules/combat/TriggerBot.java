@@ -12,11 +12,26 @@ import thunder.hack.core.Managers;
 import thunder.hack.core.manager.client.ModuleManager;
 import thunder.hack.events.impl.PlayerUpdateEvent;
 import thunder.hack.features.modules.Module;
+import thunder.hack.setting.Setting;
+import thunder.hack.setting.impl.BooleanSettingGroup;
 
 import java.util.Random;
 
 public final class TriggerBot extends Module {
-    private final TriggerBotSettings settings = new TriggerBotSettings();  // Initialize settings class
+    // Settings directly in TriggerBot class
+    public final Setting<Float> attackRange = new Setting<>("Range", 3f, 1f, 7.0f);
+    public final Setting<BooleanSettingGroup> smartCrit = new Setting<>("SmartCrit", new BooleanSettingGroup(true));
+    public final Setting<Boolean> onlySpace = new Setting<>("OnlyCrit", false).addToGroup(smartCrit);
+    public final Setting<Boolean> autoJump = new Setting<>("AutoJump", false).addToGroup(smartCrit);
+    public final Setting<Boolean> ignoreWalls = new Setting<>("IgnoreWalls", false);
+    public final Setting<Boolean> pauseEating = new Setting<>("PauseWhileEating", false);
+    public final Setting<Boolean> requireWeapon = new Setting<>("RequireWeapon", false);
+    
+    // Setting for enabling/disabling the 1-2 tick delay between attacks
+    public final Setting<Boolean> enableDelay = new Setting<>("EnableDelay", true);
+
+    // New setting to introduce a hit delay (1 tick) after cooldown is ready
+    public final Setting<Boolean> hitDelayEnabled = new Setting<>("HitDelayEnabled", true);
 
     private int delay;
     private int hitDelayTicks;  // Counter for the hit delay
@@ -28,16 +43,18 @@ public final class TriggerBot extends Module {
 
     @EventHandler
     public void onAttack(PlayerUpdateEvent e) {
-        if (mc.player.isUsingItem() && settings.pauseEating.getValue()) {
+        if (mc.player.isUsingItem() && pauseEating.getValue()) {
             return;
         }
 
         // Check if requireWeapon is enabled and if the player has a weapon in hand
-        if (settings.requireWeapon.getValue() && !isHoldingWeapon()) {
+        if (requireWeapon.getValue() && !isHoldingWeapon()) {
             return; // Exit if no weapon is found in hand
         }
+
+
         // Implement the hit delay (1 tick delay after the cooldown is ready)
-        if (settings.hitDelayEnabled.getValue()) {
+        if (hitDelayEnabled.getValue()) {
             if (hitDelayTicks > 0) {
                 hitDelayTicks--;  // Wait for the hit delay to finish
                 return;
@@ -47,14 +64,14 @@ public final class TriggerBot extends Module {
         }
 
         // If delay between hits is enabled, apply 1-2 ticks delay before hitting again
-        if (settings.enableDelay.getValue()) {
+        if (enableDelay.getValue()) {
             if (delay > 0) {
                 delay--;
                 return; // Wait for the delay to finish
             }
         }
 
-        if (!mc.options.jumpKey.isPressed() && mc.player.isOnGround() && settings.autoJump.getValue()) {
+        if (!mc.options.jumpKey.isPressed() && mc.player.isOnGround() && autoJump.getValue()) {
             mc.player.jump();
         }
 
@@ -66,13 +83,13 @@ public final class TriggerBot extends Module {
             }
         }
 
-        Entity ent = Managers.PLAYER.getRtxTarget(mc.player.getYaw(), mc.player.getPitch(), settings.attackRange.getValue(), settings.ignoreWalls.getValue());
+        Entity ent = Managers.PLAYER.getRtxTarget(mc.player.getYaw(), mc.player.getPitch(), attackRange.getValue(), ignoreWalls.getValue());
         if (ent != null && !Managers.FRIEND.isFriend(ent.getName().getString())) {
             mc.interactionManager.attackEntity(mc.player, ent);
             mc.player.swingHand(Hand.MAIN_HAND);
 
             // Set delay for the next hit (only if delay between hits is enabled)
-            if (settings.enableDelay.getValue()) {
+            if (enableDelay.getValue()) {
                 delay = random.nextInt(2) + 1;  // Random delay between 1 and 2 ticks (50-100ms)
             }
         }
@@ -80,7 +97,7 @@ public final class TriggerBot extends Module {
 
     private boolean autoCrit() {
         boolean reasonForSkipCrit =
-                !settings.smartCrit.getValue().isEnabled()
+                !smartCrit.getValue().isEnabled()
                         || mc.player.getAbilities().flying
                         || (mc.player.isFallFlying() || ModuleManager.elytraPlus.isEnabled())
                         || mc.player.hasStatusEffect(StatusEffects.BLINDNESS)
@@ -96,7 +113,7 @@ public final class TriggerBot extends Module {
         boolean mergeWithTargetStrafe = !ModuleManager.targetStrafe.isEnabled() || !ModuleManager.targetStrafe.jump.getValue();
         boolean mergeWithSpeed = !ModuleManager.speed.isEnabled() || mc.player.isOnGround();
 
-        if (!mc.options.jumpKey.isPressed() && mergeWithTargetStrafe && mergeWithSpeed && !settings.onlySpace.getValue() && !settings.autoJump.getValue()) {
+        if (!mc.options.jumpKey.isPressed() && mergeWithTargetStrafe && mergeWithSpeed && !onlySpace.getValue() && !autoJump.getValue()) {
             return true;
         }
 
