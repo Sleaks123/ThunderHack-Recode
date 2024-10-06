@@ -40,6 +40,7 @@ public final class TriggerBot extends Module {
 
     @EventHandler
     public void onAttack(PlayerUpdateEvent e) {
+        // If the player is eating or using an item, pause the bot
         if (mc.player.isUsingItem() && pauseEating.getValue()) {
             return;
         }
@@ -63,17 +64,14 @@ public final class TriggerBot extends Module {
             mc.player.jump();
         }
 
-        // Smart crits should not be delayed
-        if (!autoCrit()) {
-            return;
-        }
-
+        // Check for the target entity within the given attack range
         Entity ent = Managers.PLAYER.getRtxTarget(mc.player.getYaw(), mc.player.getPitch(), attackRange.getValue(), ignoreWalls.getValue());
         if (ent != null && !Managers.FRIEND.isFriend(ent.getName().getString())) {
+            // Swing the player's hand and attack the entity
             mc.interactionManager.attackEntity(mc.player, ent);
             mc.player.swingHand(Hand.MAIN_HAND);
 
-            // Set delay for the next hit
+            // Reset delay for the next hit
             delay = random.nextInt(Math.round(maxReaction.getValue() - minReaction.getValue())) 
                     + Math.round(minReaction.getValue());
         }
