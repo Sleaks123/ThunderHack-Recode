@@ -14,7 +14,6 @@ import thunder.hack.events.impl.PlayerUpdateEvent;
 import thunder.hack.features.modules.Module;
 import thunder.hack.setting.Setting;
 import thunder.hack.setting.impl.BooleanSettingGroup;
-import thunder.hack.util.TimerUtil;
 
 import java.util.Random;
 
@@ -31,7 +30,7 @@ public final class TriggerBot extends Module {
     // New setting for random delay (reaction)
     public final Setting<Float> reaction = new Setting<>("Reaction", 10.0f, 50.0f, 0.0f, 200.0f).description("Delay between looking at the entity and attacking");
 
-    private final TimerUtil timer = new TimerUtil(); // Timer for managing delay
+    private long lastAttackTime = System.currentTimeMillis(); // Timer for managing delay
     private final Random random = new Random(); // For random delay
 
     public TriggerBot() {
@@ -50,7 +49,7 @@ public final class TriggerBot extends Module {
         }
 
         // Implement random delay (reaction delay between looking at entity and attacking)
-        if (!timer.delay(reaction.getValue())) {
+        if (System.currentTimeMillis() - lastAttackTime < reaction.getValue()) {
             return; // Wait until the delay is finished before attacking
         }
 
@@ -69,7 +68,7 @@ public final class TriggerBot extends Module {
             mc.player.swingHand(Hand.MAIN_HAND);
 
             // Reset the timer after attacking
-            timer.reset();
+            lastAttackTime = System.currentTimeMillis();
         }
     }
 
