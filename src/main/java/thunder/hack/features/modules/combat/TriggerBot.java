@@ -28,7 +28,7 @@ public final class TriggerBot extends Module {
     public final Setting<Boolean> requireWeapon = new Setting<>("RequireWeapon", false);
     
     // New setting for random delay (reaction)
-    public final Setting<Float> reaction = new Setting<>("Reaction", 10.0f, 50.0f, 0.0f, 200.0f).description("Delay between looking at the entity and attacking");
+    public final Setting<Float> reaction = new Setting<>("Reaction", 10.0f, v -> v >= 0.0f && v <= 200.0f).description("Delay between looking at the entity and attacking");
 
     private long lastAttackTime = System.currentTimeMillis(); // Timer for managing delay
     private final Random random = new Random(); // For random delay
