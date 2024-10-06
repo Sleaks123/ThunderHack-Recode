@@ -21,11 +21,12 @@ public final class TriggerBot extends Module {
     public final Setting<Boolean> autoJump = new Setting<>("AutoJump", false).addToGroup(smartCrit);
     public final Setting<Boolean> ignoreWalls = new Setting<>("IgnoreWalls", false);
     public final Setting<Boolean> pauseEating = new Setting<>("PauseWhileEating", false);
-    public final Setting<Integer> minDelay = new Setting<>("RandomDelayMin", 2, 0, 20);
-    public final Setting<Integer> maxDelay = new Setting<>("RandomDelayMax", 13, 0, 20);
+    public final Setting<Integer> minDelay = new Setting<>("RandomDelayMin", 10, 0, 50);  // Changed to 10ms
+    public final Setting<Integer> maxDelay = new Setting<>("RandomDelayMax", 50, 0, 50);  // Changed to 50ms
 
     private int delay;
     private final Random random = new Random(); // For random delay
+    private boolean wasAiming = false;  // Track previous aiming state
 
     public TriggerBot() {
         super("TriggerBot", Category.COMBAT);
@@ -36,29 +37,42 @@ public final class TriggerBot extends Module {
         if (mc.player.isUsingItem() && pauseEating.getValue()) {
             return;
         }
-        if (!mc.options.jumpKey.isPressed() && mc.player.isOnGround() && autoJump.getValue())
+        if (!mc.options.jumpKey.isPressed() && mc.player.isOnGround() && autoJump.getValue()) {
             mc.player.jump();
-
-        // Smart crits should not be delayed
-        if (!autoCrit()) {
-            if (delay > 0) {
-                delay--;
-                return;
-            }
         }
 
         Entity ent = Managers.PLAYER.getRtxTarget(mc.player.getYaw(), mc.player.getPitch(), attackRange.getValue(), ignoreWalls.getValue());
-        if (ent != null && !Managers.FRIEND.isFriend(ent.getName().getString())) {
+        boolean isAiming = (ent != null && !Managers.FRIEND.isFriend(ent.getName().getString()));
+
+        // Trigger delay only when going from not aiming to aiming
+        if (isAiming && !wasAiming) {
+            delay = random.nextInt(minDelay.getValue(), maxDelay.getValue() + 1);  // Random delay between 10 and 50 ms
+        }
+
+        // Wait for delay before attacking
+        if (delay > 0) {
+            delay--;
+            wasAiming = isAiming;
+            return;
+        }
+
+        // Wait until sword is fully charged
+        if (ModuleManager.aura.getAttackCooldown() < 1.0f) {
+            wasAiming = isAiming;
+            return;
+        }
+
+        // Attack logic
+        if (isAiming) {
             mc.interactionManager.attackEntity(mc.player, ent);
             mc.player.swingHand(Hand.MAIN_HAND);
 
-            // Set delay for the next hit (10 to 20 ms)
-            delay = random.nextInt(minDelay.getValue(), maxDelay.getValue() + 1) ; // (20ms / 50ms per tick = ~0.4 ticks, 10ms / 50ms = ~0.2 ticks)
-            // ulybaka1337: am i cooking???
-            // default delay is calculated with
-            // nextInt(11) + 2
-            // so max value is 11+2=13 and min is 2
+            // Reset delay after attack
+            delay = random.nextInt(minDelay.getValue(), maxDelay.getValue() + 1);
         }
+
+        // Update the aiming state
+        wasAiming = isAiming;
     }
 
     private boolean autoCrit() {
@@ -93,4 +107,3 @@ public final class TriggerBot extends Module {
         return true;
     }
 }
-
