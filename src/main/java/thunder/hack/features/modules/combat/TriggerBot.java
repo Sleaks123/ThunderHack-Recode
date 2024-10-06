@@ -30,12 +30,8 @@ public final class TriggerBot extends Module {
     // New settings for min and max reaction delay
     public final Setting<Float> minReaction = new Setting<>("MinReaction", 10.0f, 0.0f, 200.0f);
     public final Setting<Float> maxReaction = new Setting<>("MaxReaction", 50.0f, 0.0f, 200.0f);
-    // Setting for enabling/disabling the delay between attacks
-    public final Setting<Boolean> enableDelay = new Setting<>("EnableDelay", true);
-    public final Setting<Boolean> hitDelayEnabled = new Setting<>("HitDelayEnabled", true);
 
-    private int delay;
-    private int hitDelayTicks;  // Counter for the hit delay
+    private int delay; // Delay counter
     private final Random random = new Random();  // For random delay
 
     public TriggerBot() {
@@ -53,26 +49,14 @@ public final class TriggerBot extends Module {
             return; // Exit if no weapon is found in hand
         }
 
-        // Implement the hit delay (1 tick delay after the cooldown is ready)
-        if (hitDelayEnabled.getValue()) {
-            if (hitDelayTicks > 0) {
-                hitDelayTicks--;  // Wait for the hit delay to finish
-                return;
-            } else {
-                hitDelayTicks = 1;  // Set delay to 1 tick for the next swing
-            }
-        }
-
-        // If delay between hits is enabled, apply random delay between minReaction and maxReaction
-        if (enableDelay.getValue()) {
-            if (delay > 0) {
-                delay--;
-                return; // Wait for the delay to finish
-            } else {
-                // Randomly set the delay between minReaction and maxReaction
-                delay = random.nextInt(Math.round(maxReaction.getValue() - minReaction.getValue())) 
-                        + Math.round(minReaction.getValue());
-            }
+        // Random delay between minReaction and maxReaction
+        if (delay > 0) {
+            delay--;
+            return; // Wait for the delay to finish
+        } else {
+            // Randomly set the delay between minReaction and maxReaction
+            delay = random.nextInt(Math.round(maxReaction.getValue() - minReaction.getValue())) 
+                    + Math.round(minReaction.getValue());
         }
 
         if (!mc.options.jumpKey.isPressed() && mc.player.isOnGround() && autoJump.getValue()) {
@@ -81,10 +65,7 @@ public final class TriggerBot extends Module {
 
         // Smart crits should not be delayed
         if (!autoCrit()) {
-            if (delay > 0) {
-                delay--;
-                return;
-            }
+            return;
         }
 
         Entity ent = Managers.PLAYER.getRtxTarget(mc.player.getYaw(), mc.player.getPitch(), attackRange.getValue(), ignoreWalls.getValue());
@@ -92,11 +73,9 @@ public final class TriggerBot extends Module {
             mc.interactionManager.attackEntity(mc.player, ent);
             mc.player.swingHand(Hand.MAIN_HAND);
 
-            // Set delay for the next hit (only if delay between hits is enabled)
-            if (enableDelay.getValue()) {
-                delay = random.nextInt(Math.round(maxReaction.getValue() - minReaction.getValue())) 
-                        + Math.round(minReaction.getValue());
-            }
+            // Set delay for the next hit
+            delay = random.nextInt(Math.round(maxReaction.getValue() - minReaction.getValue())) 
+                    + Math.round(minReaction.getValue());
         }
     }
 
