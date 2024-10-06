@@ -14,6 +14,7 @@ import thunder.hack.events.impl.PlayerUpdateEvent;
 import thunder.hack.features.modules.Module;
 import thunder.hack.setting.Setting;
 import thunder.hack.setting.impl.BooleanSettingGroup;
+import thunder.hack.util.TimerUtil;
 
 import java.util.Random;
 
@@ -27,14 +28,10 @@ public final class TriggerBot extends Module {
     public final Setting<Boolean> pauseEating = new Setting<>("PauseWhileEating", false);
     public final Setting<Boolean> requireWeapon = new Setting<>("RequireWeapon", false);
     
-    // Setting for enabling/disabling the 1-2 tick delay between attacks
-    public final Setting<Boolean> enableDelay = new Setting<>("EnableDelay", true);
+    // New setting for random delay (reaction)
+    public final Setting<Float> reaction = new Setting<>("Reaction", 10.0f, 50.0f, 0.0f, 200.0f).description("Delay between looking at the entity and attacking");
 
-    // New setting to introduce a hit delay (1 tick) after cooldown is ready
-    public final Setting<Boolean> hitDelayEnabled = new Setting<>("HitDelayEnabled", true);
-
-    private int delay;
-    private int hitDelayTicks;  // Counter for the hit delay
+    private final TimerUtil timer = new TimerUtil(); // Timer for managing delay
     private final Random random = new Random(); // For random delay
 
     public TriggerBot() {
@@ -52,23 +49,9 @@ public final class TriggerBot extends Module {
             return; // Exit if no weapon is found in hand
         }
 
-
-        // Implement the hit delay (1 tick delay after the cooldown is ready)
-        if (hitDelayEnabled.getValue()) {
-            if (hitDelayTicks > 0) {
-                hitDelayTicks--;  // Wait for the hit delay to finish
-                return;
-            } else {
-                hitDelayTicks = 1;  // Set delay to 1 tick for the next swing
-            }
-        }
-
-        // If delay between hits is enabled, apply 1-2 ticks delay before hitting again
-        if (enableDelay.getValue()) {
-            if (delay > 0) {
-                delay--;
-                return; // Wait for the delay to finish
-            }
+        // Implement random delay (reaction delay between looking at entity and attacking)
+        if (!timer.delay(reaction.getValue())) {
+            return; // Wait until the delay is finished before attacking
         }
 
         if (!mc.options.jumpKey.isPressed() && mc.player.isOnGround() && autoJump.getValue()) {
@@ -77,10 +60,7 @@ public final class TriggerBot extends Module {
 
         // Smart crits should not be delayed
         if (!autoCrit()) {
-            if (delay > 0) {
-                delay--;
-                return;
-            }
+            return;
         }
 
         Entity ent = Managers.PLAYER.getRtxTarget(mc.player.getYaw(), mc.player.getPitch(), attackRange.getValue(), ignoreWalls.getValue());
@@ -88,10 +68,8 @@ public final class TriggerBot extends Module {
             mc.interactionManager.attackEntity(mc.player, ent);
             mc.player.swingHand(Hand.MAIN_HAND);
 
-            // Set delay for the next hit (only if delay between hits is enabled)
-            if (enableDelay.getValue()) {
-                delay = random.nextInt(2) + 1;  // Random delay between 1 and 2 ticks (50-100ms)
-            }
+            // Reset the timer after attacking
+            timer.reset();
         }
     }
 
