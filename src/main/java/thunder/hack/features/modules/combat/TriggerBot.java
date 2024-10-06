@@ -18,7 +18,7 @@ import thunder.hack.setting.impl.BooleanSettingGroup;
 import java.util.Random;
 
 public final class TriggerBot extends Module {
-    // Settings directly in TriggerBot class
+    // Settings for attack range, smart crit, and other options
     public final Setting<Float> attackRange = new Setting<>("Range", 3f, 1f, 7.0f);
     public final Setting<BooleanSettingGroup> smartCrit = new Setting<>("SmartCrit", new BooleanSettingGroup(true));
     public final Setting<Boolean> onlySpace = new Setting<>("OnlyCrit", false).addToGroup(smartCrit);
@@ -26,12 +26,18 @@ public final class TriggerBot extends Module {
     public final Setting<Boolean> ignoreWalls = new Setting<>("IgnoreWalls", false);
     public final Setting<Boolean> pauseEating = new Setting<>("PauseWhileEating", false);
     public final Setting<Boolean> requireWeapon = new Setting<>("RequireWeapon", false);
-    
-    // New setting for random delay (reaction)
-    public final Setting<Float> reaction = new Setting<>("Reaction", 10.0f, v -> v >= 0.0f && v <= 200.0f).description("Delay between looking at the entity and attacking");
 
-    private long lastAttackTime = System.currentTimeMillis(); // Timer for managing delay
-    private final Random random = new Random(); // For random delay
+    // New settings for min and max reaction delay
+    public final Setting<Float> minReaction = new Setting<>("MinReaction", 10.0f, 0.0f, 200.0f).description("Minimum delay between looking at the entity and attacking");
+    public final Setting<Float> maxReaction = new Setting<>("MaxReaction", 50.0f, 0.0f, 200.0f).description("Maximum delay between looking at the entity and attacking");
+
+    // Setting for enabling/disabling the delay between attacks
+    public final Setting<Boolean> enableDelay = new Setting<>("EnableDelay", true);
+    public final Setting<Boolean> hitDelayEnabled = new Setting<>("HitDelayEnabled", true);
+
+    private int delay;
+    private int hitDelayTicks;  // Counter for the hit delay
+    private final Random random = new Random();  // For random delay
 
     public TriggerBot() {
         super("TriggerBot", Category.COMBAT);
@@ -48,9 +54,26 @@ public final class TriggerBot extends Module {
             return; // Exit if no weapon is found in hand
         }
 
-        // Implement random delay (reaction delay between looking at entity and attacking)
-        if (System.currentTimeMillis() - lastAttackTime < reaction.getValue()) {
-            return; // Wait until the delay is finished before attacking
+        // Implement the hit delay (1 tick delay after the cooldown is ready)
+        if (hitDelayEnabled.getValue()) {
+            if (hitDelayTicks > 0) {
+                hitDelayTicks--;  // Wait for the hit delay to finish
+                return;
+            } else {
+                hitDelayTicks = 1;  // Set delay to 1 tick for the next swing
+            }
+        }
+
+        // If delay between hits is enabled, apply random delay between minReaction and maxReaction
+        if (enableDelay.getValue()) {
+            if (delay > 0) {
+                delay--;
+                return; // Wait for the delay to finish
+            } else {
+                // Randomly set the delay between minReaction and maxReaction
+                delay = random.nextInt(Math.round(maxReaction.getValue() - minReaction.getValue())) 
+                        + Math.round(minReaction.getValue());
+            }
         }
 
         if (!mc.options.jumpKey.isPressed() && mc.player.isOnGround() && autoJump.getValue()) {
@@ -59,7 +82,10 @@ public final class TriggerBot extends Module {
 
         // Smart crits should not be delayed
         if (!autoCrit()) {
-            return;
+            if (delay > 0) {
+                delay--;
+                return;
+            }
         }
 
         Entity ent = Managers.PLAYER.getRtxTarget(mc.player.getYaw(), mc.player.getPitch(), attackRange.getValue(), ignoreWalls.getValue());
@@ -67,8 +93,11 @@ public final class TriggerBot extends Module {
             mc.interactionManager.attackEntity(mc.player, ent);
             mc.player.swingHand(Hand.MAIN_HAND);
 
-            // Reset the timer after attacking
-            lastAttackTime = System.currentTimeMillis();
+            // Set delay for the next hit (only if delay between hits is enabled)
+            if (enableDelay.getValue()) {
+                delay = random.nextInt(Math.round(maxReaction.getValue() - minReaction.getValue())) 
+                        + Math.round(minReaction.getValue());
+            }
         }
     }
 
