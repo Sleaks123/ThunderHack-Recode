@@ -28,23 +28,23 @@ public class TriggerBotMod implements ModInitializer {
     }
 
     public void onPlayerUpdate() {
-        if (getMc().player == null) return; // Additional null check
+        if (net.minecraft.client.MinecraftClient.getInstance().player == null) return; // Null check for player
 
         // Check if player is eating and the "pauseEating" option is enabled
-        if (getMc().player.isUsingItem() && pauseEating) {
+        if (net.minecraft.client.MinecraftClient.getInstance().player.isUsingItem() && pauseEating) {
             return;
         }
 
         // Auto jump if enabled
-        if (!getMc().options.jumpKey.isPressed() &&
-            getMc().player.isOnGround() && 
+        if (!net.minecraft.client.MinecraftClient.getInstance().options.jumpKey.isPressed() &&
+            net.minecraft.client.MinecraftClient.getInstance().player.isOnGround() && 
             autoJumpEnabled) {
-            getMc().player.jump();
+            net.minecraft.client.MinecraftClient.getInstance().player.jump();
         }
 
-        // Smart crit logic
+        // Smart crit logic (delay does not affect smart crits)
         if (!performSmartCrit()) {
-            // Delay handling between attacks, but delay doesn't affect smart crits
+            // Delay handling between attacks
             if (delay > 0) {
                 delay--;
                 return;
@@ -61,7 +61,7 @@ public class TriggerBotMod implements ModInitializer {
 
         if (targetEntity != null && !isFriend(targetEntity.getName().getString())) {
             // Check if cooldown is greater than or equal to 95%
-            if (getMc().player.getAttackCooldownProgress(0.5f) >= 0.95f) {
+            if (net.minecraft.client.MinecraftClient.getInstance().player.getAttackCooldownProgress(0.5f) >= 0.95f) {
 
                 // If delay is active, decrease the counter and return early
                 if (delay > 0) {
@@ -70,9 +70,9 @@ public class TriggerBotMod implements ModInitializer {
                 }
 
                 // Attack the target entity
-                getMc().interactionManager.attackEntity(
-                    getMc().player, targetEntity);
-                getMc().player.swingHand(Hand.MAIN_HAND);
+                net.minecraft.client.MinecraftClient.getInstance().interactionManager.attackEntity(
+                    net.minecraft.client.MinecraftClient.getInstance().player, targetEntity);
+                net.minecraft.client.MinecraftClient.getInstance().player.swingHand(Hand.MAIN_HAND);
 
                 // Set random delay for next attack (between 10-50 ms)
                 delay = random.nextInt(minDelay, maxDelay + 1);
@@ -81,35 +81,24 @@ public class TriggerBotMod implements ModInitializer {
     }
 
     private boolean performSmartCrit() {
-        if (getMc().player == null) return false;
-
-        // Additional logic for crit timing
-        if (getMc().player.isOnGround() || inAir.getObject()) {
-            if (!pauseOnKill.getObject().booleanValue() || !OneLineUtil.isInvalidPlayer()) {
-                if (critTiming.getObject()) {
-                    if (getMc().player != null && !getMc().player.isOnGround() && getMc().player.fallDistance > 0) {
-                        return false;
-                    }
-                }
-            }
-        }
+        if (net.minecraft.client.MinecraftClient.getInstance().player == null) return false;
 
         // Check for conditions where a crit should be skipped
-        boolean skipCritConditions = getMc().player.getAbilities().flying ||
-                getMc().player.isFallFlying() ||
-                getMc().player.hasStatusEffect(net.minecraft.entity.effect.StatusEffects.BLINDNESS) ||
-                getMc().player.isHoldingOntoLadder() ||
-                getMc().world.getBlockState(BlockPos.ofFloored(getMc().player.getPos())).getBlock() == net.minecraft.block.Blocks.COBWEB;
+        boolean skipCritConditions = net.minecraft.client.MinecraftClient.getInstance().player.getAbilities().flying ||
+                net.minecraft.client.MinecraftClient.getInstance().player.isFallFlying() ||
+                net.minecraft.client.MinecraftClient.getInstance().player.hasStatusEffect(net.minecraft.entity.effect.StatusEffects.BLINDNESS) ||
+                net.minecraft.client.MinecraftClient.getInstance().player.isHoldingOntoLadder() ||
+                net.minecraft.client.MinecraftClient.getInstance().world.getBlockState(BlockPos.ofFloored(net.minecraft.client.MinecraftClient.getInstance().player.getPos())).getBlock() == net.minecraft.block.Blocks.COBWEB;
 
         // Cooldown and ground checks for crits
-        if (getMc().player.getAttackCooldownProgress(0.5f) < 0.9f) {
+        if (net.minecraft.client.MinecraftClient.getInstance().player.getAttackCooldownProgress(0.5f) < 0.9f) {
             return false;
         }
 
         // Conditions where crit is allowed
         boolean canCrit = !skipCritConditions &&
-                !getMc().player.isOnGround() &&
-                getMc().player.fallDistance > 0.0f;
+                !net.minecraft.client.MinecraftClient.getInstance().player.isOnGround() &&
+                net.minecraft.client.MinecraftClient.getInstance().player.fallDistance > 0.0f;
 
         return canCrit;
     }
@@ -127,14 +116,17 @@ public class TriggerBotMod implements ModInitializer {
     }
 
     // Check if the player is holding a valid weapon
-    private boolean isHoldingValidWeapon() {
-        Item item = getMc().player.getMainHandStack().getItem();
-        return item == Items.SWORD || item == Items.BOW || 
-               item == Items.HOE || item == Items.PICKAXE || item == Items.AXE;
-    }
+private boolean isHoldingValidWeapon() {
+    Item item = net.minecraft.client.MinecraftClient.getInstance().player.getMainHandStack().getItem();
+    return item == Items.WOODEN_SWORD || item == Items.STONE_SWORD || item == Items.IRON_SWORD || 
+           item == Items.GOLDEN_SWORD || item == Items.DIAMOND_SWORD || item == Items.NETHERITE_SWORD ||
+           item == Items.BOW ||
+           item == Items.WOODEN_HOE || item == Items.STONE_HOE || item == Items.IRON_HOE || 
+           item == Items.GOLDEN_HOE || item == Items.DIAMOND_HOE || item == Items.NETHERITE_HOE ||
+           item == Items.WOODEN_PICKAXE || item == Items.STONE_PICKAXE || item == Items.IRON_PICKAXE || 
+           item == Items.GOLDEN_PICKAXE || item == Items.DIAMOND_PICKAXE || item == Items.NETHERITE_PICKAXE ||
+           item == Items.WOODEN_AXE || item == Items.STONE_AXE || item == Items.IRON_AXE || 
+           item == Items.GOLDEN_AXE || item == Items.DIAMOND_AXE || item == Items.NETHERITE_AXE;
+}
 
-    // Placeholder for MinecraftClient accessor
-    private net.minecraft.client.MinecraftClient getMc() {
-        return net.minecraft.client.MinecraftClient.getInstance();
-    }
 }
