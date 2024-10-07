@@ -9,7 +9,7 @@ import net.fabricmc.api.ModInitializer;
 
 import java.util.Random;
 
-public class TriggerBotMod implements ModInitializer {
+public class Triggerbot implements Module {
     private int delay = 0;
     private Random random = new Random();
 
