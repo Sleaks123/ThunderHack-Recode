@@ -1,123 +1,111 @@
-package thunder.hack.features.modules.combat;
+package net.fabricmc.example;
 
-import meteordevelopment.orbit.EventHandler;
-import net.minecraft.block.Blocks;
 import net.minecraft.entity.Entity;
-import net.minecraft.entity.effect.StatusEffects;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
 import net.minecraft.util.Hand;
 import net.minecraft.util.math.BlockPos;
-import thunder.hack.core.Managers;
-import thunder.hack.core.manager.client.ModuleManager;
-import thunder.hack.events.impl.PlayerUpdateEvent;
-import thunder.hack.features.modules.Module;
-import thunder.hack.setting.Setting;
-import thunder.hack.setting.impl.BooleanSettingGroup;
+import net.fabricmc.api.ModInitializer;
 
 import java.util.Random;
 
-public final class TriggerBot extends Module {
-    // Settings for attack range, smart crit, and other options
-    public final Setting<Float> attackRange = new Setting<>("Range", 3f, 1f, 7.0f);
-    public final Setting<BooleanSettingGroup> smartCrit = new Setting<>("SmartCrit", new BooleanSettingGroup(true));
-    public final Setting<Boolean> onlySpace = new Setting<>("OnlyCrit", false).addToGroup(smartCrit);
-    public final Setting<Boolean> autoJump = new Setting<>("AutoJump", false).addToGroup(smartCrit);
-    public final Setting<Boolean> ignoreWalls = new Setting<>("IgnoreWalls", false);
-    public final Setting<Boolean> pauseEating = new Setting<>("PauseWhileEating", false);
-    public final Setting<Boolean> requireWeapon = new Setting<>("RequireWeapon", false);
+public class TriggerBotMod implements ModInitializer {
+    public static final TriggerBotMod INSTANCE = new TriggerBotMod();
+    private int delay = 0;
+    private Random random = new Random();
 
-    // New settings for min and max reaction delay
-    public final Setting<Float> minReaction = new Setting<>("MinReaction", 10.0f, 0.0f, 200.0f);
-    public final Setting<Float> maxReaction = new Setting<>("MaxReaction", 50.0f, 0.0f, 200.0f);
+    // Configuration options
+    private int minDelay = 10; // in milliseconds
+    private int maxDelay = 50; // in milliseconds
+    private boolean smartCritEnabled = true;
+    private boolean autoJumpEnabled = true;
+    private boolean pauseEating = true;
 
-    private int delay; // Delay counter
-    private final Random random = new Random();  // For random delay
-
-    public TriggerBot() {
-        super("TriggerBot", Category.COMBAT);
+    @Override
+    public void onInitialize() {
+        // Mod initialization code (if any)
     }
 
-    @EventHandler
-    public void onAttack(PlayerUpdateEvent e) {
-        // If the player is eating or using an item, pause the bot
-        if (mc.player.isUsingItem() && pauseEating.getValue()) {
+    public void onPlayerUpdate() {
+        // Check if player is eating and the "pauseEating" option is enabled
+        if (net.minecraft.client.MinecraftClient.getInstance().player.isUsingItem() && pauseEating) {
             return;
         }
 
-        // Check if requireWeapon is enabled and if the player has a weapon in hand
-        if (requireWeapon.getValue() && !isHoldingWeapon()) {
-            return; // Exit if no weapon is found in hand
+        // Auto jump if enabled
+        if (!net.minecraft.client.MinecraftClient.getInstance().options.jumpKey.isPressed() && 
+            net.minecraft.client.MinecraftClient.getInstance().player.isOnGround() && 
+            autoJumpEnabled) {
+            net.minecraft.client.MinecraftClient.getInstance().player.jump();
         }
 
-        // Random delay between minReaction and maxReaction
-        if (delay > 0) {
-            delay--;
-            return; // Wait for the delay to finish
-        } else {
-            // Randomly set the delay between minReaction and maxReaction
-            delay = random.nextInt(Math.round(maxReaction.getValue() - minReaction.getValue())) 
-                    + Math.round(minReaction.getValue());
+        // Smart crit logic
+        if (!performSmartCrit()) {
+            // Delay handling between attacks
+            if (delay > 0) {
+                delay--;
+                return;
+            }
         }
 
-        if (!mc.options.jumpKey.isPressed() && mc.player.isOnGround() && autoJump.getValue()) {
-            mc.player.jump();
-        }
+        // Get the entity the player is looking at
+        Entity targetEntity = getRtxTarget();
 
-        // Check for the target entity within the given attack range
-        Entity ent = Managers.PLAYER.getRtxTarget(mc.player.getYaw(), mc.player.getPitch(), attackRange.getValue(), ignoreWalls.getValue());
-        if (ent != null && !Managers.FRIEND.isFriend(ent.getName().getString())) {
-            // Swing the player's hand and attack the entity
-            mc.interactionManager.attackEntity(mc.player, ent);
-            mc.player.swingHand(Hand.MAIN_HAND);
+        if (targetEntity != null && !isFriend(targetEntity.getName().getString())) {
+            // Check if cooldown is greater than or equal to 95%
+            if (net.minecraft.client.MinecraftClient.getInstance().player.getAttackCooldownProgress(0.5f) >= 0.95f) {
 
-            // Reset delay for the next hit
-            delay = random.nextInt(Math.round(maxReaction.getValue() - minReaction.getValue())) 
-                    + Math.round(minReaction.getValue());
+                // If delay is active, decrease the counter and return early
+                if (delay > 0) {
+                    delay--;
+                    return;
+                }
+
+                // Attack the target entity
+                net.minecraft.client.MinecraftClient.getInstance().interactionManager.attackEntity(
+                    net.minecraft.client.MinecraftClient.getInstance().player, targetEntity);
+                net.minecraft.client.MinecraftClient.getInstance().player.swingHand(Hand.MAIN_HAND);
+
+                // Set random delay for next attack (between 10-50 ms)
+                delay = random.nextInt(minDelay, maxDelay + 1);
+            }
         }
     }
 
-    private boolean autoCrit() {
-        boolean reasonForSkipCrit =
-                !smartCrit.getValue().isEnabled()
-                        || mc.player.getAbilities().flying
-                        || (mc.player.isFallFlying() || ModuleManager.elytraPlus.isEnabled())
-                        || mc.player.hasStatusEffect(StatusEffects.BLINDNESS)
-                        || mc.player.isHoldingOntoLadder()
-                        || mc.world.getBlockState(BlockPos.ofFloored(mc.player.getPos())).getBlock() == Blocks.COBWEB;
+    private boolean performSmartCrit() {
+        // Check for conditions where a crit should be skipped
+        boolean skipCritConditions = net.minecraft.client.MinecraftClient.getInstance().player.getAbilities().flying ||
+                net.minecraft.client.MinecraftClient.getInstance().player.isFallFlying() ||
+                net.minecraft.client.MinecraftClient.getInstance().player.hasStatusEffect(net.minecraft.entity.effect.StatusEffects.BLINDNESS) ||
+                net.minecraft.client.MinecraftClient.getInstance().player.isHoldingOntoLadder() ||
+                net.minecraft.client.MinecraftClient.getInstance().world.getBlockState(BlockPos.ofFloored(net.minecraft.client.MinecraftClient.getInstance().player.getPos())).getBlock() == net.minecraft.block.Blocks.COBWEB;
 
-        if (mc.player.fallDistance > 1 && mc.player.fallDistance < 1.14)
+        // Check if fall distance is optimal for a crit
+        if (net.minecraft.client.MinecraftClient.getInstance().player.fallDistance > 0.15f && 
+            net.minecraft.client.MinecraftClient.getInstance().player.fallDistance < 0.25f) {
             return false;
+        }
 
-        if (ModuleManager.aura.getAttackCooldown() < (mc.player.isOnGround() ? 1f : 0.9f))
+        // Cooldown and ground checks for crits
+        if (net.minecraft.client.MinecraftClient.getInstance().player.getAttackCooldownProgress(0.5f) < 0.9f) {
             return false;
-
-        boolean mergeWithTargetStrafe = !ModuleManager.targetStrafe.isEnabled() || !ModuleManager.targetStrafe.jump.getValue();
-        boolean mergeWithSpeed = !ModuleManager.speed.isEnabled() || mc.player.isOnGround();
-
-        if (!mc.options.jumpKey.isPressed() && mergeWithTargetStrafe && mergeWithSpeed && !onlySpace.getValue() && !autoJump.getValue()) {
-            return true;
         }
 
-        if (mc.player.isInLava()) {
-            return true;
-        }
+        // Conditions where crit is allowed
+        boolean canCrit = !skipCritConditions &&
+                !net.minecraft.client.MinecraftClient.getInstance().player.isOnGround() &&
+                net.minecraft.client.MinecraftClient.getInstance().player.fallDistance > 0.0f;
 
-        if (!mc.options.jumpKey.isPressed() && ModuleManager.aura.isAboveWater()) {
-            return true;
-        }
-
-        if (!reasonForSkipCrit) {
-            return !mc.player.isOnGround() && mc.player.fallDistance > 0.0f;
-        }
-        return true;
+        return canCrit;
     }
 
-    // Helper function to check if the player is holding a weapon
-    private boolean isHoldingWeapon() {
-        ItemStack itemInHand = mc.player.getMainHandStack();
-        return itemInHand.getItem() == Items.DIAMOND_SWORD || itemInHand.getItem() == Items.NETHERITE_SWORD ||
-               itemInHand.getItem() == Items.IRON_SWORD || itemInHand.getItem() == Items.GOLDEN_SWORD ||
-               itemInHand.getItem() == Items.STONE_SWORD || itemInHand.getItem() == Items.WOODEN_SWORD;
+    // Placeholder for getting the entity the player is looking at
+    private Entity getRtxTarget() {
+        // Implement ray tracing logic or use an existing ray tracing method
+        return null;
+    }
+
+    // Placeholder for checking if the entity is a friend
+    private boolean isFriend(String name) {
+        // Implement friend checking logic or use your mod's friend system
+        return false;
     }
 }
