@@ -1,6 +1,8 @@
 package net.fabricmc.example;
 
 import net.minecraft.entity.Entity;
+import net.minecraft.item.Item;
+import net.minecraft.item.Items;
 import net.minecraft.util.Hand;
 import net.minecraft.util.math.BlockPos;
 import net.fabricmc.api.ModInitializer;
@@ -18,6 +20,7 @@ public class TriggerBotMod implements ModInitializer {
     private boolean smartCritEnabled = true;
     private boolean autoJumpEnabled = true;
     private boolean pauseEating = true;
+    private boolean requireWeapon = true;
 
     @Override
     public void onInitialize() {
@@ -25,21 +28,23 @@ public class TriggerBotMod implements ModInitializer {
     }
 
     public void onPlayerUpdate() {
+        if (getMc().player == null) return; // Additional null check
+
         // Check if player is eating and the "pauseEating" option is enabled
-        if (net.minecraft.client.MinecraftClient.getInstance().player.isUsingItem() && pauseEating) {
+        if (getMc().player.isUsingItem() && pauseEating) {
             return;
         }
 
         // Auto jump if enabled
-        if (!net.minecraft.client.MinecraftClient.getInstance().options.jumpKey.isPressed() && 
-            net.minecraft.client.MinecraftClient.getInstance().player.isOnGround() && 
+        if (!getMc().options.jumpKey.isPressed() &&
+            getMc().player.isOnGround() && 
             autoJumpEnabled) {
-            net.minecraft.client.MinecraftClient.getInstance().player.jump();
+            getMc().player.jump();
         }
 
         // Smart crit logic
         if (!performSmartCrit()) {
-            // Delay handling between attacks
+            // Delay handling between attacks, but delay doesn't affect smart crits
             if (delay > 0) {
                 delay--;
                 return;
@@ -49,9 +54,14 @@ public class TriggerBotMod implements ModInitializer {
         // Get the entity the player is looking at
         Entity targetEntity = getRtxTarget();
 
+        // Check for valid weapon (sword, bow, hoe, pickaxe, or axe)
+        if (requireWeapon && !isHoldingValidWeapon()) {
+            return;
+        }
+
         if (targetEntity != null && !isFriend(targetEntity.getName().getString())) {
             // Check if cooldown is greater than or equal to 95%
-            if (net.minecraft.client.MinecraftClient.getInstance().player.getAttackCooldownProgress(0.5f) >= 0.95f) {
+            if (getMc().player.getAttackCooldownProgress(0.5f) >= 0.95f) {
 
                 // If delay is active, decrease the counter and return early
                 if (delay > 0) {
@@ -60,9 +70,9 @@ public class TriggerBotMod implements ModInitializer {
                 }
 
                 // Attack the target entity
-                net.minecraft.client.MinecraftClient.getInstance().interactionManager.attackEntity(
-                    net.minecraft.client.MinecraftClient.getInstance().player, targetEntity);
-                net.minecraft.client.MinecraftClient.getInstance().player.swingHand(Hand.MAIN_HAND);
+                getMc().interactionManager.attackEntity(
+                    getMc().player, targetEntity);
+                getMc().player.swingHand(Hand.MAIN_HAND);
 
                 // Set random delay for next attack (between 10-50 ms)
                 delay = random.nextInt(minDelay, maxDelay + 1);
@@ -71,28 +81,35 @@ public class TriggerBotMod implements ModInitializer {
     }
 
     private boolean performSmartCrit() {
-        // Check for conditions where a crit should be skipped
-        boolean skipCritConditions = net.minecraft.client.MinecraftClient.getInstance().player.getAbilities().flying ||
-                net.minecraft.client.MinecraftClient.getInstance().player.isFallFlying() ||
-                net.minecraft.client.MinecraftClient.getInstance().player.hasStatusEffect(net.minecraft.entity.effect.StatusEffects.BLINDNESS) ||
-                net.minecraft.client.MinecraftClient.getInstance().player.isHoldingOntoLadder() ||
-                net.minecraft.client.MinecraftClient.getInstance().world.getBlockState(BlockPos.ofFloored(net.minecraft.client.MinecraftClient.getInstance().player.getPos())).getBlock() == net.minecraft.block.Blocks.COBWEB;
+        if (getMc().player == null) return false;
 
-        // Check if fall distance is optimal for a crit
-        if (net.minecraft.client.MinecraftClient.getInstance().player.fallDistance > 0.15f && 
-            net.minecraft.client.MinecraftClient.getInstance().player.fallDistance < 0.25f) {
-            return false;
+        // Additional logic for crit timing
+        if (getMc().player.isOnGround() || inAir.getObject()) {
+            if (!pauseOnKill.getObject().booleanValue() || !OneLineUtil.isInvalidPlayer()) {
+                if (critTiming.getObject()) {
+                    if (getMc().player != null && !getMc().player.isOnGround() && getMc().player.fallDistance > 0) {
+                        return false;
+                    }
+                }
+            }
         }
 
+        // Check for conditions where a crit should be skipped
+        boolean skipCritConditions = getMc().player.getAbilities().flying ||
+                getMc().player.isFallFlying() ||
+                getMc().player.hasStatusEffect(net.minecraft.entity.effect.StatusEffects.BLINDNESS) ||
+                getMc().player.isHoldingOntoLadder() ||
+                getMc().world.getBlockState(BlockPos.ofFloored(getMc().player.getPos())).getBlock() == net.minecraft.block.Blocks.COBWEB;
+
         // Cooldown and ground checks for crits
-        if (net.minecraft.client.MinecraftClient.getInstance().player.getAttackCooldownProgress(0.5f) < 0.9f) {
+        if (getMc().player.getAttackCooldownProgress(0.5f) < 0.9f) {
             return false;
         }
 
         // Conditions where crit is allowed
         boolean canCrit = !skipCritConditions &&
-                !net.minecraft.client.MinecraftClient.getInstance().player.isOnGround() &&
-                net.minecraft.client.MinecraftClient.getInstance().player.fallDistance > 0.0f;
+                !getMc().player.isOnGround() &&
+                getMc().player.fallDistance > 0.0f;
 
         return canCrit;
     }
@@ -107,5 +124,17 @@ public class TriggerBotMod implements ModInitializer {
     private boolean isFriend(String name) {
         // Implement friend checking logic or use your mod's friend system
         return false;
+    }
+
+    // Check if the player is holding a valid weapon
+    private boolean isHoldingValidWeapon() {
+        Item item = getMc().player.getMainHandStack().getItem();
+        return item == Items.SWORD || item == Items.BOW || 
+               item == Items.HOE || item == Items.PICKAXE || item == Items.AXE;
+    }
+
+    // Placeholder for MinecraftClient accessor
+    private net.minecraft.client.MinecraftClient getMc() {
+        return net.minecraft.client.MinecraftClient.getInstance();
     }
 }
