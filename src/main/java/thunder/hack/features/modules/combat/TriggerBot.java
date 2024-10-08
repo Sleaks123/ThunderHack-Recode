@@ -115,9 +115,21 @@ public final class TriggerBot extends Module {
         return true;
     }
 
+    // Use the more general check based on tool classes
     private boolean isHoldingRequiredWeapon() {
         Item heldItem = mc.player.getMainHandStack().getItem();
-        return heldItem == Items.SWORD || heldItem == Items.BOW || heldItem == Items.AXE ||
-                heldItem == Items.PICKAXE || heldItem == Items.TRIDENT;
+        return heldItem == Items.BOW || heldItem == Items.TRIDENT || isSword(heldItem) || isAxe(heldItem) || isPickaxe(heldItem);
+    }
+
+    private boolean isSword(Item item) {
+        return item instanceof net.minecraft.item.SwordItem;
+    }
+
+    private boolean isAxe(Item item) {
+        return item instanceof net.minecraft.item.AxeItem;
+    }
+
+    private boolean isPickaxe(Item item) {
+        return item instanceof net.minecraft.item.PickaxeItem;
     }
 }
