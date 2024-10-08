@@ -35,53 +35,55 @@ public final class TriggerBot extends Module {
         super("TriggerBot", Category.COMBAT);
     }
 
-    @EventHandler
-    public void onAttack(PlayerUpdateEvent e) {
-        if (mc.player.isUsingItem() && pauseEating.getValue()) {
-            return;
-        }
-        if (!mc.options.jumpKey.isPressed() && mc.player.isOnGround() && autoJump.getValue()) {
-            mc.player.jump();
-        }
+  @EventHandler
+public void onAttack(PlayerUpdateEvent e) {
+    if (mc.player.isUsingItem() && pauseEating.getValue()) {
+        return;
+    }
+    if (!mc.options.jumpKey.isPressed() && mc.player.isOnGround() && autoJump.getValue()) {
+        mc.player.jump();
+    }
 
-        // Check if holding required weapon
-        if (requireWeapons.getValue() && !isHoldingRequiredWeapon()) {
-            return;
-        }
+    // Check if holding required weapon
+    if (requireWeapons.getValue() && !isHoldingRequiredWeapon()) {
+        return;
+    }
 
-        Entity ent = Managers.PLAYER.getRtxTarget(mc.player.getYaw(), mc.player.getPitch(), attackRange.getValue(), ignoreWalls.getValue());
-        boolean isAiming = (ent != null && !Managers.FRIEND.isFriend(ent.getName().getString()));
+    Entity ent = Managers.PLAYER.getRtxTarget(mc.player.getYaw(), mc.player.getPitch(), attackRange.getValue(), ignoreWalls.getValue());
+    boolean isAiming = (ent != null && !Managers.FRIEND.isFriend(ent.getName().getString()));
 
-        // Trigger delay only when going from not aiming to aiming
-        if (isAiming && !wasAiming) {
-            delay = random.nextInt(minDelay.getValue(), maxDelay.getValue() + 1);  // Random delay between 10 and 50 ms
-        }
+    // Trigger delay only when going from not aiming to aiming, and if not performing a smart crit
+    if (isAiming && !wasAiming && !autoCrit()) {
+        delay = random.nextInt(minDelay.getValue(), maxDelay.getValue() + 1);  // Random delay between 10 and 50 ms
+    }
 
-        // Wait for delay before attacking
-        if (delay > 0) {
-            delay--;
-            wasAiming = isAiming;
-            return;
-        }
+    // Wait for delay before attacking, unless autoCrit is true
+    if (delay > 0 && !autoCrit()) {
+        delay--;
+        wasAiming = isAiming;
+        return;
+    }
 
-        // Wait until sword is fully charged
-        if (ModuleManager.aura.getAttackCooldown() < 1.0f) {
-            wasAiming = isAiming;
-            return;
-        }
+    // Wait until sword is fully charged
+    if (ModuleManager.aura.getAttackCooldown() < 1.0f) {
+        wasAiming = isAiming;
+        return;
+    }
 
-        // Attack logic
-        if (isAiming) {
-            mc.interactionManager.attackEntity(mc.player, ent);
-            mc.player.swingHand(Hand.MAIN_HAND);
+    // Attack logic
+    if (isAiming) {
+        mc.interactionManager.attackEntity(mc.player, ent);
+        mc.player.swingHand(Hand.MAIN_HAND);
 
-            // Reset delay after attack
+        // Reset delay after attack, but only if not smart critting
+        if (!autoCrit()) {
             delay = random.nextInt(minDelay.getValue(), maxDelay.getValue() + 1);
         }
-
-        // Update the aiming state
-        wasAiming = isAiming;
     }
+
+    // Update the aiming state
+    wasAiming = isAiming;
+}
 
     private boolean autoCrit() {
         boolean reasonForSkipCrit =
