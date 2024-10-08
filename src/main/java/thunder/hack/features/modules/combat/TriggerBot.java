@@ -4,6 +4,8 @@ import meteordevelopment.orbit.EventHandler;
 import net.minecraft.block.Blocks;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.effect.StatusEffects;
+import net.minecraft.item.Item;
+import net.minecraft.item.Items;
 import net.minecraft.util.Hand;
 import net.minecraft.util.math.BlockPos;
 import thunder.hack.core.Managers;
@@ -23,6 +25,7 @@ public final class TriggerBot extends Module {
     public final Setting<Boolean> pauseEating = new Setting<>("PauseWhileEating", false);
     public final Setting<Integer> minDelay = new Setting<>("RandomDelayMin", 10, 0, 50);  // Changed to 10ms
     public final Setting<Integer> maxDelay = new Setting<>("RandomDelayMax", 50, 0, 50);  // Changed to 50ms
+    public final Setting<Boolean> requireWeapons = new Setting<>("RequireWeapons", true);  // Added requireWeapons option
 
     private int delay;
     private final Random random = new Random(); // For random delay
@@ -39,6 +42,11 @@ public final class TriggerBot extends Module {
         }
         if (!mc.options.jumpKey.isPressed() && mc.player.isOnGround() && autoJump.getValue()) {
             mc.player.jump();
+        }
+
+        // Check if holding required weapon
+        if (requireWeapons.getValue() && !isHoldingRequiredWeapon()) {
+            return;
         }
 
         Entity ent = Managers.PLAYER.getRtxTarget(mc.player.getYaw(), mc.player.getPitch(), attackRange.getValue(), ignoreWalls.getValue());
@@ -105,5 +113,11 @@ public final class TriggerBot extends Module {
         if (!reasonForSkipCrit)
             return !mc.player.isOnGround() && mc.player.fallDistance > 0.0f;
         return true;
+    }
+
+    private boolean isHoldingRequiredWeapon() {
+        Item heldItem = mc.player.getMainHandStack().getItem();
+        return heldItem == Items.SWORD || heldItem == Items.BOW || heldItem == Items.AXE ||
+                heldItem == Items.PICKAXE || heldItem == Items.TRIDENT;
     }
 }
