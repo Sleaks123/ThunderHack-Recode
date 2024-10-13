@@ -90,10 +90,6 @@ public void onAttack(PlayerUpdateEvent e) {
     wasAiming = isAiming;
 }
 
-    // Update the aiming state
-    wasAiming = isAiming;
-}
-
     private boolean autoCrit() {
         boolean reasonForSkipCrit =
                 !smartCrit.getValue().isEnabled()
