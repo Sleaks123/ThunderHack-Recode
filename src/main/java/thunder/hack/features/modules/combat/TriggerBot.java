@@ -37,6 +37,11 @@ public final class TriggerBot extends Module {
 
   @EventHandler
 public void onAttack(PlayerUpdateEvent e) {
+    // Check if the player is in a GUI or the game is not focused
+    if (mc.currentScreen != null || !mc.isWindowFocused()) {
+        return;
+    }
+
     if (mc.player.isUsingItem() && pauseEating.getValue()) {
         return;
     }
@@ -80,6 +85,10 @@ public void onAttack(PlayerUpdateEvent e) {
             delay = random.nextInt(minDelay.getValue(), maxDelay.getValue() + 1);
         }
     }
+
+    // Update the aiming state
+    wasAiming = isAiming;
+}
 
     // Update the aiming state
     wasAiming = isAiming;
