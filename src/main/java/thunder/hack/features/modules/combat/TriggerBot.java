@@ -23,8 +23,8 @@ public final class TriggerBot extends Module {
     public final Setting<Boolean> autoJump = new Setting<>("AutoJump", false).addToGroup(smartCrit);
     public final Setting<Boolean> ignoreWalls = new Setting<>("IgnoreWalls", false);
     public final Setting<Boolean> pauseEating = new Setting<>("PauseWhileEating", false);
-    public final Setting<Integer> minDelay = new Setting<>("RandomDelayMin", 10, 0, 50);  // Changed to 10ms
-    public final Setting<Integer> maxDelay = new Setting<>("RandomDelayMax", 50, 0, 50);  // Changed to 50ms
+    public final Setting<Boolean> minDelay = new Setting<>("RandomDelayMin", 10.0f, 0, 50.0f);  // Changed to 10ms
+    public final Setting<Boolean> maxDelay = new Setting<>("RandomDelayMax", 50.0f, 0, 50.0f);  // Changed to 50ms
     public final Setting<Boolean> requireWeapons = new Setting<>("RequireWeapons", true);  // Added requireWeapons option
 
     private int delay;
