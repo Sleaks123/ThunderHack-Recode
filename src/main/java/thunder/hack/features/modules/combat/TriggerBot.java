@@ -27,68 +27,71 @@ public final class TriggerBot extends Module {
     public final Setting<Integer> maxDelay = new Setting<>("RandomDelayMax", 50, 0, 50);  // Changed to 50ms
     public final Setting<Boolean> requireWeapons = new Setting<>("RequireWeapons", true);  // Added requireWeapons option
 
-    private int delay;
     private final Random random = new Random(); // For random delay
     private boolean wasAiming = false;  // Track previous aiming state
+    private long lastAttackTime = 0;  // Timer for delays in milliseconds
 
     public TriggerBot() {
         super("TriggerBot", Category.COMBAT);
     }
 
-  @EventHandler
-public void onAttack(PlayerUpdateEvent e) {
-    // Check if the player is in a GUI or the game is not focused
-    if (mc.currentScreen != null || !mc.isWindowFocused()) {
-        return;
-    }
-
-    if (mc.player.isUsingItem() && pauseEating.getValue()) {
-        return;
-    }
-    if (!mc.options.jumpKey.isPressed() && mc.player.isOnGround() && autoJump.getValue()) {
-        mc.player.jump();
-    }
-
-    // Check if holding required weapon
-    if (requireWeapons.getValue() && !isHoldingRequiredWeapon()) {
-        return;
-    }
-
-    Entity ent = Managers.PLAYER.getRtxTarget(mc.player.getYaw(), mc.player.getPitch(), attackRange.getValue(), ignoreWalls.getValue());
-    boolean isAiming = (ent != null && !Managers.FRIEND.isFriend(ent.getName().getString()));
-
-    // Trigger delay only when going from not aiming to aiming, and if not performing a smart crit
-    if (isAiming && !wasAiming && !autoCrit()) {
-        delay = random.nextInt(minDelay.getValue(), maxDelay.getValue() + 1);  // Random delay between 10 and 50 ms
-    }
-
-    // Wait for delay before attacking, unless autoCrit is true
-    if (delay > 0 && !autoCrit()) {
-        delay--;
-        wasAiming = isAiming;
-        return;
-    }
-
-    // Wait until sword is fully charged
-    if (ModuleManager.aura.getAttackCooldown() < 1.0f) {
-        wasAiming = isAiming;
-        return;
-    }
-
-    // Attack logic
-    if (isAiming) {
-        mc.interactionManager.attackEntity(mc.player, ent);
-        mc.player.swingHand(Hand.MAIN_HAND);
-
-        // Reset delay after attack, but only if not smart critting
-        if (!autoCrit()) {
-            delay = random.nextInt(minDelay.getValue(), maxDelay.getValue() + 1);
+    @EventHandler
+    public void onAttack(PlayerUpdateEvent e) {
+        // Check if the player is in a GUI or the game is not focused
+        if (mc.currentScreen != null || !mc.isWindowFocused()) {
+            return;
         }
+
+        if (mc.player.isUsingItem() && pauseEating.getValue()) {
+            return;
+        }
+        if (!mc.options.jumpKey.isPressed() && mc.player.isOnGround() && autoJump.getValue()) {
+            mc.player.jump();
+        }
+
+        // Check if holding required weapon
+        if (requireWeapons.getValue() && !isHoldingRequiredWeapon()) {
+            return;
+        }
+
+        Entity ent = Managers.PLAYER.getRtxTarget(mc.player.getYaw(), mc.player.getPitch(), attackRange.getValue(), ignoreWalls.getValue());
+        boolean isAiming = (ent != null && !Managers.FRIEND.isFriend(ent.getName().getString()));
+
+        // Trigger delay only when going from not aiming to aiming, and if not performing a smart crit
+        if (isAiming && !wasAiming && !autoCrit()) {
+            lastAttackTime = System.currentTimeMillis() + getRandomDelay();  // Set delay in milliseconds
+        }
+
+        // Wait for the specified delay in milliseconds before attacking
+        if (System.currentTimeMillis() < lastAttackTime && !autoCrit()) {
+            wasAiming = isAiming;
+            return;
+        }
+
+        // Wait until sword is fully charged
+        if (ModuleManager.aura.getAttackCooldown() < 1.0f) {
+            wasAiming = isAiming;
+            return;
+        }
+
+        // Attack logic
+        if (isAiming) {
+            mc.interactionManager.attackEntity(mc.player, ent);
+            mc.player.swingHand(Hand.MAIN_HAND);
+
+            // Reset delay after attack
+            if (!autoCrit()) {
+                lastAttackTime = System.currentTimeMillis() + getRandomDelay();  // Set next delay after attack
+            }
+        }
+
+        // Update the aiming state
+        wasAiming = isAiming;
     }
 
-    // Update the aiming state
-    wasAiming = isAiming;
-}
+    private int getRandomDelay() {
+        return random.nextInt(minDelay.getValue(), maxDelay.getValue() + 1);  // Return random delay between min and max
+    }
 
     private boolean autoCrit() {
         boolean reasonForSkipCrit =
